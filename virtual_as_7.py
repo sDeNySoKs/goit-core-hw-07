@@ -1,8 +1,6 @@
 import pickle
 from collections import UserDict
 from datetime import datetime, timedelta
- 
-
 
 class Field:
     def __init__(self, value):
@@ -23,12 +21,13 @@ class Phone(Field):
 class Birthday(Field):
     def __init__(self, value):
         try:
-            self.value = datetime.strptime(value, "%d.%m.%Y").date()
+            datetime.strptime(value, "%d.%m.%Y")
+            self.value = value 
         except ValueError:
             raise ValueError("Invalid date format. Use DD.MM.YYYY")
         
     def __str__(self):
-        return self.value.strftime("%d.%m.%Y")
+        return self.value
         
 class Record:
     def __init__(self, name):
@@ -43,20 +42,13 @@ class Record:
         phone_obj = self.find_phone(phone_number)
         if phone_obj:
             self.phones.remove(phone_obj)
-        else:
-            pass
 
     def edit_phone(self, old_phone, new_phone):
-        phone_obj = self.find_phone(old_phone)
-        if phone_obj:
-            self.remove_phone(old_phone)
-            try:
-                self.add_phone(new_phone)
-            except ValueError as e:
-                self.add_phone(old_phone)
-                raise e
-        else:
+        if not self.find_phone(old_phone):
             raise ValueError(f"Номер {old_phone} не знайдено.")
+        
+        self.add_phone(new_phone)
+        self.remove_phone(old_phone)
 
     def find_phone(self, phone_number):
         for phone in self.phones:
@@ -91,12 +83,14 @@ class AddressBook(UserDict):
         for record in self.data.values():
             if record.birthday is None:
                 continue
-
-            birthday_date = record.birthday.value
+            
+            birthday_date = datetime.strptime(record.birthday.value, "%d.%m.%Y").date()
+            
             birthday_this_year = birthday_date.replace(year=today.year)
 
             if birthday_this_year < today:
                 birthday_this_year = birthday_this_year.replace(year=today.year + 1)
+            
             days_until_birthday = (birthday_this_year - today).days
 
             if 0 <= days_until_birthday <= 7:
@@ -117,6 +111,7 @@ class AddressBook(UserDict):
     def __str__(self):
         return "\n".join(str(record) for record in self.data.values())
     
+
 def save_data(book, filename="addressbook.pkl"):
     with open(filename, "wb") as f:
         pickle.dump(book, f)
@@ -126,10 +121,10 @@ def load_data(filename="addressbook.pkl"):
         with open(filename, "rb") as f:
             return pickle.load(f)
     except FileNotFoundError:
-            return AddressBook()  # Повернення нової адресної книги, якщо файл не знайдено
+        return AddressBook()
 
 
-#Декоратори і функції-хендлери
+# Декоратори і функції-хендлери
 
 def input_error(func):
     def inner(*args, **kwargs):
@@ -141,6 +136,8 @@ def input_error(func):
             return "Контакт не знайдено"
         except IndexError:
             return "Введіть ім'я користувача"
+        except AttributeError:
+            return "Контакт не знайдено" 
         except Exception as e:
             return f"Помилка: {e}"
     return inner
@@ -167,23 +164,17 @@ def add_contact(args, book: AddressBook):
 def change_contact(args, book: AddressBook):
     name, old_phone, new_phone, *_ = args
     record = book.find(name)
-    if record:
-        record.edit_phone(old_phone, new_phone)
-        return "Номер телефону змінено"
-    else:
-        raise KeyError
+    record.edit_phone(old_phone, new_phone)
+    return "Номер телефону змінено"
     
 @input_error
 def show_phone(args, book: AddressBook):
     name, *_ = args
     record = book.find(name)
-    if record:
-        return f"Номер телефону {name}: {'; '.join(p.value for p in record.phones)}"
-    else:
-        raise KeyError
+    return f"Номер телефону {name}: {'; '.join(p.value for p in record.phones)}"
     
 @input_error
-def show_all(book:AddressBook):
+def show_all(book: AddressBook):
     if not book.data:
         return "Адресна книга пуста"
     return str(book)
@@ -192,23 +183,17 @@ def show_all(book:AddressBook):
 def add_birthday(args, book: AddressBook):
     name, birthday, *_ = args
     record = book.find(name)
-    if record:
-        record.add_birthday(birthday)
-        return "Дату народження додано"
-    else:
-        raise KeyError
+    record.add_birthday(birthday)
+    return "Дату народження додано"
     
 @input_error
 def show_birthday(args, book: AddressBook):
     name, *_ = args
     record = book.find(name)
-    if record:
-        if record.birthday:
-            return f"День народження {name}: {record.birthday}"
-        else:
-            return "День народження не встановлено"
+    if record.birthday:
+        return f"День народження {name}: {record.birthday}"
     else:
-        raise KeyError
+        return "День народження не встановлено"
     
 @input_error
 def birthdays(args, book: AddressBook):
